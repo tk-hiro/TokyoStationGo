@@ -24,3 +24,57 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes reel-tick {
+  from {
+    transform: translateY(70%);
+    opacity: 0;
+    filter: blur(3px);
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+    filter: blur(0.5px);
+  }
+}
+
+@keyframes reel-land {
+  0% {
+    transform: translateY(35%) scale(0.85);
+    opacity: 0.4;
+    filter: blur(2px);
+  }
+  55% {
+    transform: translateY(0) scale(1.18);
+    opacity: 1;
+    filter: blur(0);
+  }
+  75% {
+    transform: translateY(0) scale(0.96);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes reel-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(250, 204, 21, 0);
+  }
+  50% {
+    box-shadow: 0 0 32px 4px rgba(250, 204, 21, 0.45);
+  }
+}
+
+@keyframes lines-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

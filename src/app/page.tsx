@@ -1,65 +1,140 @@
-import Image from "next/image";
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+import stationsData from '@/data/stations.json'
+import type { Station } from '@/types/station'
+
+const stations = stationsData as Station[]
+
+// 抽選中の表示間隔(ms)。最初は速く、徐々に遅くしてリール風に減速させる
+const SPIN_SCHEDULE = [
+  45, 45, 45, 45, 45, 45, 50, 50, 50, 55,
+  60, 70, 80, 95, 115, 140, 175, 220, 280, 360, 460,
+]
 
 export default function Home() {
+  const [picked, setPicked] = useState<Station | null>(null)
+  const [displayName, setDisplayName] = useState<string | null>(null)
+  const [isSpinning, setIsSpinning] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const tickRef = useRef(0)
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
+
+  const drawStation = () => {
+    if (isSpinning) return
+
+    setPicked(null)
+    setIsSpinning(true)
+
+    const finalStation = stations[Math.floor(Math.random() * stations.length)]
+    let step = 0
+    let lastIdx = -1
+
+    const tick = () => {
+      if (step < SPIN_SCHEDULE.length) {
+        // 直前と同じ駅は避けて視覚的な変化をはっきりさせる
+        let idx = Math.floor(Math.random() * stations.length)
+        if (idx === lastIdx) idx = (idx + 1) % stations.length
+        lastIdx = idx
+        tickRef.current += 1
+        setDisplayName(stations[idx].name)
+        timerRef.current = setTimeout(tick, SPIN_SCHEDULE[step++])
+      } else {
+        tickRef.current += 1
+        setDisplayName(finalStation.name)
+        setPicked(finalStation)
+        setIsSpinning(false)
+      }
+    }
+    tick()
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="flex flex-col flex-1 items-center justify-center min-h-screen bg-zinc-50 font-sans dark:bg-black">
+      <main className="flex w-full max-w-xl flex-col items-center gap-10 px-6 py-16">
+        <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+          TokyoStationGo
+        </h1>
+
+        <button
+          type="button"
+          onClick={drawStation}
+          disabled={isSpinning}
+          className="rounded-full bg-zinc-900 px-8 py-3 text-base font-medium text-white transition-all hover:bg-zinc-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
+        >
+          {isSpinning ? '抽選中...' : picked ? 'もう一度抽選する' : '今日の駅を抽選する'}
+        </button>
+
+        <section
+          className={`w-full overflow-hidden rounded-2xl border px-6 py-8 text-center transition-colors ${
+            picked
+              ? 'border-green-300 bg-green-50 dark:border-green-500/60 dark:bg-green-950/40'
+              : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
+          }`}
+          style={picked ? { animation: 'reel-glow 1.4s ease-out 1' } : undefined}
+        >
+          <p className="text-sm tracking-wider text-zinc-500 dark:text-zinc-400">
+            本日の駅
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+          <div className="relative mx-auto mt-3 flex h-16 items-center justify-center overflow-hidden">
+            {displayName ? (
+              <span
+                key={tickRef.current}
+                className="block text-3xl font-semibold text-zinc-900 will-change-transform dark:text-zinc-50"
+                style={{
+                  animation: isSpinning
+                    ? 'reel-tick 80ms ease-out'
+                    : 'reel-land 600ms cubic-bezier(0.2, 1.6, 0.4, 1)',
+                }}
+              >
+                {displayName}
+              </span>
+            ) : (
+              <span className="text-2xl tracking-widest text-zinc-300 dark:text-zinc-700">
+                ？？？
+              </span>
+            )}
+            {/* リール上下のフェードマスクで奥行きを演出 */}
+            <div
+              className={`pointer-events-none absolute inset-x-0 top-0 h-3 bg-gradient-to-b to-transparent ${
+                picked ? 'from-green-50 dark:from-green-950/40' : 'from-white dark:from-zinc-900'
+              }`}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+            <div
+              className={`pointer-events-none absolute inset-x-0 bottom-0 h-3 bg-gradient-to-t to-transparent ${
+                picked ? 'from-green-50 dark:from-green-950/40' : 'from-white dark:from-zinc-900'
+              }`}
+            />
+          </div>
+          {picked && !isSpinning && (
+            <div style={{ animation: 'lines-fade-in 450ms ease-out both' }}>
+              <ul className="mt-5 flex flex-wrap justify-center gap-2">
+                {picked.line_names.map((line) => (
+                  <li
+                    key={line}
+                    className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                  >
+                    {line}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={`https://www.google.com/maps?q=${picked.lat},${picked.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-5 inline-flex items-center gap-2 rounded-full border border-zinc-300 bg-white px-5 py-2 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              >
+                Google マップで確認する
+              </a>
+            </div>
+          )}
+        </section>
       </main>
     </div>
-  );
+  )
 }
