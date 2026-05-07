@@ -8,6 +8,8 @@ import {
   calculateDistance,
   getCurrentPosition,
 } from '@/lib/location'
+import { addCheckin } from '@/lib/checkins'
+import { recordVisit } from '@/lib/visits'
 
 type CheckinResult =
   | { kind: 'success'; distance: number }
@@ -16,19 +18,39 @@ type CheckinResult =
 
 const stations = stationsData as Station[]
 
+// 全駅から路線を集約。重複は line_cd で除去し、line_cd 昇順で並べる
+const availableLines = (() => {
+  const map = new Map<number, string>()
+  for (const s of stations) {
+    s.lines.forEach((code, i) => {
+      if (!map.has(code)) map.set(code, s.line_names[i])
+    })
+  }
+  return [...map.entries()]
+    .map(([code, name]) => ({ code, name }))
+    .sort((a, b) => a.code - b.code)
+})()
+
+const ALL_LINES = 'all' as const
+type LineFilter = typeof ALL_LINES | number
+
 const formatDistance = (m: number) =>
   m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`
 
 export default function StationsPage() {
   const [query, setQuery] = useState('')
+  const [lineFilter, setLineFilter] = useState<LineFilter>(ALL_LINES)
   const [pendingId, setPendingId] = useState<number | null>(null)
   const [results, setResults] = useState<Record<number, CheckinResult>>({})
 
   const filtered = useMemo(() => {
     const q = query.trim()
-    if (!q) return stations
-    return stations.filter((s) => s.name.includes(q))
-  }, [query])
+    return stations.filter((s) => {
+      if (q && !s.name.includes(q)) return false
+      if (lineFilter !== ALL_LINES && !s.lines.includes(lineFilter)) return false
+      return true
+    })
+  }, [query, lineFilter])
 
   const handleCheckin = async (station: Station) => {
     if (pendingId !== null) return
@@ -46,10 +68,15 @@ export default function StationsPage() {
         station.lat,
         station.lng,
       )
+      const success = distance <= ARRIVAL_RADIUS_M
+      if (success) {
+        addCheckin(station, distance)
+        void recordVisit(station)
+      }
       setResults((prev) => ({
         ...prev,
         [station.id]: {
-          kind: distance <= ARRIVAL_RADIUS_M ? 'success' : 'too_far',
+          kind: success ? 'success' : 'too_far',
           distance,
         },
       }))
@@ -82,7 +109,32 @@ export default function StationsPage() {
         </p>
       </header>
 
-      <div className="sticky top-14 z-10 -mx-4 bg-zinc-50/90 px-4 py-3 backdrop-blur dark:bg-black/80 md:static md:top-auto md:mx-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-0 md:dark:bg-transparent">
+      <div className="sticky top-14 z-10 -mx-4 flex flex-col gap-2 bg-zinc-50/90 px-4 py-3 backdrop-blur dark:bg-black/80 md:static md:top-auto md:mx-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-0 md:dark:bg-transparent">
+        <label className="relative block">
+          <span className="sr-only">路線で絞り込み</span>
+          <select
+            value={lineFilter === ALL_LINES ? ALL_LINES : String(lineFilter)}
+            onChange={(e) =>
+              setLineFilter(
+                e.target.value === ALL_LINES ? ALL_LINES : Number(e.target.value),
+              )
+            }
+            className="w-full appearance-none rounded-full border border-zinc-300 bg-white px-5 py-3 pr-10 text-sm text-zinc-900 shadow-sm outline-none transition-colors focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:focus:border-zinc-300"
+          >
+            <option value={ALL_LINES}>すべての路線</option>
+            {availableLines.map((line) => (
+              <option key={line.code} value={line.code}>
+                {line.name}
+              </option>
+            ))}
+          </select>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-500 dark:text-zinc-400"
+          >
+            ▾
+          </span>
+        </label>
         <label className="relative block">
           <span className="sr-only">駅名で検索</span>
           <input
@@ -111,7 +163,9 @@ export default function StationsPage() {
                 className={`flex flex-col gap-3 rounded-2xl border p-4 shadow-sm transition-colors sm:flex-row sm:items-center sm:justify-between ${
                   failed
                     ? 'border-red-200 bg-red-50 dark:border-red-500/40 dark:bg-red-950/40'
-                    : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
+                    : result?.kind === 'success'
+                      ? 'border-green-300 bg-green-50 dark:border-green-500/40 dark:bg-green-950/40'
+                      : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
                 }`}
               >
                 <div className="min-w-0 flex-1">

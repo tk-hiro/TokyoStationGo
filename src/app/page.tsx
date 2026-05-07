@@ -8,6 +8,8 @@ import {
   calculateDistance,
   getCurrentPosition,
 } from '@/lib/location'
+import { addCheckin } from '@/lib/checkins'
+import { recordVisit } from '@/lib/visits'
 
 type CheckinResult =
   | { kind: 'success'; distance: number }
@@ -79,8 +81,13 @@ export default function Home() {
         picked.lat,
         picked.lng,
       )
+      const success = distance <= ARRIVAL_RADIUS_M
+      if (success) {
+        addCheckin(picked, distance)
+        void recordVisit(picked)
+      }
       setCheckinResult({
-        kind: distance <= ARRIVAL_RADIUS_M ? 'success' : 'too_far',
+        kind: success ? 'success' : 'too_far',
         distance,
       })
     } catch (err) {
