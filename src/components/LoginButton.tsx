@@ -3,8 +3,6 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
-const CALLBACK_URL = 'http://localhost:3000/auth/callback'
-
 type Props = {
   className?: string
   // ログイン後に戻るパス（相対パスのみ受け付ける）
@@ -19,6 +17,15 @@ function isSafeNext(value: string | undefined): value is string {
   return true
 }
 
+// OAuth コールバック URL を環境に応じて解決する。
+// NEXT_PUBLIC_SITE_URL が設定されていればそれを使い、
+// 未設定ならブラウザの window.location.origin にフォールバックする。
+function getCallbackUrl(): string {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+  return new URL('/auth/callback', baseUrl).toString()
+}
+
 export default function LoginButton({ className, next }: Props) {
   const [loading, setLoading] = useState(false)
 
@@ -26,7 +33,7 @@ export default function LoginButton({ className, next }: Props) {
     if (loading) return
     setLoading(true)
 
-    const redirectTo = new URL(CALLBACK_URL)
+    const redirectTo = new URL(getCallbackUrl())
     if (isSafeNext(next)) {
       redirectTo.searchParams.set('next', next)
     }
