@@ -1,7 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import type { Session } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 
 export type MenuItem = {
   href: string
@@ -18,10 +21,24 @@ export const MENU_ITEMS: MenuItem[] = [
 type Props = {
   open: boolean
   onClose: () => void
+  session: Session
 }
 
-export default function Sidebar({ open, onClose }: Props) {
+export default function Sidebar({ open, onClose, session }: Props) {
   const pathname = usePathname()
+  const [signingOut, setSigningOut] = useState(false)
+
+  const handleLogout = async () => {
+    if (signingOut) return
+    setSigningOut(true)
+    const { error } = await supabase.auth.signOut()
+    if (error) console.error('[auth] ログアウト失敗:', error)
+    setSigningOut(false)
+    onClose()
+  }
+
+  const userLabel =
+    session.user.email ?? session.user.user_metadata?.full_name ?? null
 
   return (
     <>
@@ -74,6 +91,25 @@ export default function Sidebar({ open, onClose }: Props) {
             })}
           </ul>
         </nav>
+
+        <div className="flex flex-col gap-2 border-t border-zinc-200 p-3 dark:border-zinc-800">
+          {userLabel && (
+            <p
+              className="truncate px-2 text-xs text-zinc-500 dark:text-zinc-400"
+              title={userLabel}
+            >
+              {userLabel}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={signingOut}
+            className="flex w-full items-center justify-center rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            {signingOut ? 'ログアウト中...' : 'ログアウト'}
+          </button>
+        </div>
       </aside>
     </>
   )

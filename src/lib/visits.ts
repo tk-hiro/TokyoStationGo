@@ -12,33 +12,52 @@ export type VisitRow = {
   visit_count: number
 }
 
-// visits テーブルから訪問済み駅の一覧を取得する。最終訪問日時の降順。
-export async function fetchVisits(): Promise<VisitRow[]> {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select(
-      'station_id, station_name, line_name, checked_in_at, last_visited_at, visit_count',
-    )
-    .is('user_id', null)
-    .order('last_visited_at', { ascending: false })
+export class NotAuthenticatedError extends Error {
+  constructor() {
+    super('ログインが必要です')
+    this.name = 'NotAuthenticatedError'
+  }
+}
 
-  if (error) throw error
-  return (data ?? []) as VisitRow[]
+// 現在のログインユーザーの id を取得する。未ログインなら null。
+// supabase.auth.getUser() は JWT を検証してから user を返す。
+async function getCurrentUserId(): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.auth.getUser()
+    if (error) {
+      // セッションが無い場合は AuthSessionMissingError が返るので、未ログイン扱いにする
+      const message = error.message?.toLowerCase() ?? ''
+      if (message.includes('auth session missing')) return null
+      console.error('[visits] ユーザー取得失敗:', error)
+      return null
+    }
+    return data.user?.id ?? null
+  } catch (err) {
+    console.error('[visits] ユーザー取得で例外:', err)
+    return null
+  }
 }
 
 // Supabase の visits テーブルへチェックイン記録を保存する。
-// 同じ station_id のレコードがあれば訪問回数+1で更新、なければ新規 insert。
+// ログイン中のユーザー(user_id)に紐付け、同じ駅の既存レコードがあれば
+// last_visited_at と visit_count を更新する。
 // チェックイン体験を壊さないため、エラーは catch して console に出すだけにする。
 export async function recordVisit(station: Station): Promise<void> {
   const now = new Date().toISOString()
   const lineName = station.line_names.join('、')
 
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      console.warn('[visits] 未ログインのため visits 保存をスキップ')
+      return
+    }
+
     const { data: existing, error: selectError } = await supabase
       .from(TABLE)
       .select('id, visit_count')
       .eq('station_id', station.id)
-      .is('user_id', null)
+      .eq('user_id', userId)
       .maybeSingle()
 
     if (selectError) {
@@ -73,7 +92,7 @@ export async function recordVisit(station: Station): Promise<void> {
       checked_in_at: now,
       last_visited_at: now,
       visit_count: 1,
-      user_id: null,
+      user_id: userId,
     })
 
     if (insertError) {
@@ -84,4 +103,24 @@ export async function recordVisit(station: Station): Promise<void> {
   } catch (err) {
     console.error('[visits] 想定外のエラー:', err)
   }
+}
+
+// 現在のログインユーザーの訪問済み駅を取得する。最終訪問日時の降順。
+// 未ログインの場合は NotAuthenticatedError を throw する。
+export async function fetchVisits(): Promise<VisitRow[]> {
+  const userId = await getCurrentUserId()
+  if (!userId) {
+    throw new NotAuthenticatedError()
+  }
+
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select(
+      'station_id, station_name, line_name, checked_in_at, last_visited_at, visit_count',
+    )
+    .eq('user_id', userId)
+    .order('last_visited_at', { ascending: false })
+
+  if (error) throw error
+  return (data ?? []) as VisitRow[]
 }

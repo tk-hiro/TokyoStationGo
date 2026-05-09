@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 // localStorage版（旧実装）はSupabaseへ移行のためコメントアウト
 // import stationsData from '@/data/stations.json'
 // import type { Station } from '@/types/station'
 // import { loadCheckins, summarizeByStation } from '@/lib/checkins'
 // import type { StationVisitSummary } from '@/lib/checkins'
-import { fetchVisits } from '@/lib/visits'
+import { fetchVisits, NotAuthenticatedError } from '@/lib/visits'
 import type { VisitRow } from '@/lib/visits'
 
 // 全駅数は仕様で 615 に固定
@@ -21,7 +22,7 @@ const dateFormatter = new Intl.DateTimeFormat('ja-JP', {
   minute: '2-digit',
 })
 
-type FetchStatus = 'loading' | 'ready' | 'error'
+type FetchStatus = 'loading' | 'ready' | 'error' | 'unauthenticated'
 
 export default function MyPage() {
   const [status, setStatus] = useState<FetchStatus>('loading')
@@ -48,6 +49,10 @@ export default function MyPage() {
       })
       .catch((err) => {
         if (cancelled) return
+        if (err instanceof NotAuthenticatedError) {
+          setStatus('unauthenticated')
+          return
+        }
         console.error('[mypage] visits 取得失敗:', err)
         setErrorMessage(
           err instanceof Error ? err.message : 'データの取得に失敗しました',
@@ -126,6 +131,25 @@ export default function MyPage() {
               {errorMessage}
             </p>
           )}
+        </div>
+      )}
+
+      {status === 'unauthenticated' && (
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-zinc-200 bg-white px-6 py-10 text-center dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="flex flex-col gap-1">
+            <p className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+              ログインしてください
+            </p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              訪問記録を表示するにはログインが必要です
+            </p>
+          </div>
+          <Link
+            href="/login?next=/mypage"
+            className="inline-flex items-center justify-center rounded-full bg-zinc-900 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          >
+            ログイン
+          </Link>
         </div>
       )}
 
