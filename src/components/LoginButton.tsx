@@ -18,11 +18,14 @@ function isSafeNext(value: string | undefined): value is string {
 }
 
 // OAuth コールバック URL を環境に応じて解決する。
-// NEXT_PUBLIC_SITE_URL が設定されていればそれを使い、
-// 未設定ならブラウザの window.location.origin にフォールバックする。
+// このボタンはブラウザでしか押せないので、現在表示中のオリジンを最優先にする。
+// （これによりローカル開発時は localhost、本番デプロイ時はその URL に自動で揃う）
+// NEXT_PUBLIC_SITE_URL は SSR や非ブラウザ環境のフォールバック扱い。
 function getCallbackUrl(): string {
   const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+    typeof window !== 'undefined'
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_SITE_URL || ''
   return new URL('/auth/callback', baseUrl).toString()
 }
 
