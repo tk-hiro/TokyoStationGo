@@ -131,7 +131,7 @@ const specialTitles: TitleDef[] = [
   {
     id: 'target-same-day',
     name: '引いたからには行く',
-    description: '抽選したその日のうちに目標駅へ到達',
+    description: 'ガチャを回したその日のうちに目標駅へ到達',
     icon: '🎯',
     category: 'special',
     condition: { kind: 'targetSameDay' },

@@ -7,21 +7,13 @@ import { STATIONS_BOUNDS, type MapStation } from '@/lib/mapData'
 import LineOverlay from './LineOverlay'
 import PlaceLabels from './PlaceLabels'
 import StationPopup from './StationPopup'
+import { TILE_ATTRIBUTION, TILE_SUBDOMAINS, tileUrlForColorScheme } from './tiles'
 
 type Props = {
   stations: MapStation[]
   // 指定された駅を中心に表示し、ポップアップを自動で開く（/map?station=<id>）
   focusStationId: number | null
 }
-
-// 地名・道路ラベルの無い白地図タイル（CARTO basemap）。
-// 情報量を駅マーカーだけに絞ってゲーム盤面のような見た目にする
-const TILE_LIGHT =
-  'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png'
-const TILE_DARK =
-  'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png'
-const TILE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
 
 // マーカーの見た目。訪問済みは大きく発光させて「獲得済み」感を出し、
 // 未訪問は薄いリングにして「未収集」感を出す（色はマイページの emerald に揃える）
@@ -69,11 +61,6 @@ const DRAW_ORDER: Record<MapStation['status'], number> = {
 }
 
 export default function StationMap({ stations, focusStationId }: Props) {
-  // このコンポーネントは ssr:false で読み込まれるため window に安全に触れる
-  const prefersDark =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-
   const focusStation =
     focusStationId !== null
       ? (stations.find((s) => s.id === focusStationId) ?? null)
@@ -102,8 +89,8 @@ export default function StationMap({ stations, focusStationId }: Props) {
     >
       <TileLayer
         attribution={TILE_ATTRIBUTION}
-        url={prefersDark ? TILE_DARK : TILE_LIGHT}
-        subdomains="abcd"
+        url={tileUrlForColorScheme()}
+        subdomains={TILE_SUBDOMAINS}
       />
       <LineOverlay />
       <PlaceLabels />

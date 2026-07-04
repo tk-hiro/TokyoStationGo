@@ -13,7 +13,7 @@ export type MenuItem = {
 }
 
 export const MENU_ITEMS: MenuItem[] = [
-  { href: '/', label: '駅を抽選する', icon: '🎲' },
+  { href: '/', label: '駅ガチャ', icon: '🎰' },
   { href: '/stations', label: '駅一覧', icon: '🚉' },
   { href: '/map', label: 'マップ', icon: '🗺️' },
   { href: '/titles', label: '達成目録', icon: '🏆' },
